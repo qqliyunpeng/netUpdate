@@ -82,40 +82,28 @@ pub fn exe_dir() -> PathBuf {
         .unwrap_or_default()
 }
 
-pub fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map_err(|error| format!("无法定位应用数据目录: {error}"))
+/// The same application data directory Tauri uses, resolved without an
+/// `AppHandle` so the CLI can share configuration with the GUI.
+pub fn default_data_dir() -> Result<PathBuf, String> {
+    dirs::data_dir()
+        .map(|directory| directory.join("com.localtools.netupdate"))
+        .ok_or_else(|| "无法定位系统应用数据目录".to_string())
 }
 
-pub fn session_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(data_dir(app)?.join("session.json"))
+pub fn session_path_in(data_dir: &Path) -> PathBuf {
+    data_dir.join("session.json")
 }
 
-pub fn tmp_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let directory = data_dir(app)?.join("tmp");
+pub fn tmp_dir_in(data_dir: &Path) -> Result<PathBuf, String> {
+    let directory = data_dir.join("tmp");
     std::fs::create_dir_all(&directory)
         .map_err(|error| format!("无法创建临时目录 {}: {error}", directory.display()))?;
     Ok(directory)
 }
 
-pub fn paths(app: &AppHandle) -> Result<AppPaths, String> {
-    let app_dir = exe_dir();
-    let data_dir = data_dir(app)?;
-    let tmp_dir = tmp_dir(app)?;
-    let session_file = data_dir.join("session.json");
-    Ok(AppPaths {
-        app_dir: app_dir.to_string_lossy().to_string(),
-        data_dir: data_dir.to_string_lossy().to_string(),
-        tmp_dir: tmp_dir.to_string_lossy().to_string(),
-        session_file: session_file.to_string_lossy().to_string(),
-    })
-}
-
-pub fn load(app: &AppHandle) -> SessionState {
-    let mut session = session_path(app)
+pub fn load_from_dir(data_dir: &Path) -> SessionState {
+    let mut session = std::fs::read_to_string(session_path_in(data_dir))
         .ok()
-        .and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|raw| serde_json::from_str::<SessionState>(&raw).ok())
         .unwrap_or_else(|| SessionState {
             config: import_legacy_config().unwrap_or_default(),
@@ -126,15 +114,58 @@ pub fn load(app: &AppHandle) -> SessionState {
     session
 }
 
-pub fn save(app: &AppHandle, session: &SessionState) -> Result<(), String> {
-    let path = session_path(app)?;
-    if let Some(directory) = path.parent() {
-        std::fs::create_dir_all(directory).map_err(|error| error.to_string())?;
-    }
+pub fn save_to_dir(data_dir: &Path, session: &SessionState) -> Result<(), String> {
+    std::fs::create_dir_all(data_dir).map_err(|error| error.to_string())?;
     let mut stored = session.clone();
     stored.layout = LAYOUT_VERSION;
     let payload = serde_json::to_vec_pretty(&stored).map_err(|error| error.to_string())?;
-    std::fs::write(path, payload).map_err(|error| error.to_string())
+    std::fs::write(session_path_in(data_dir), payload).map_err(|error| error.to_string())
+}
+
+pub fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|error| format!("无法定位应用数据目录: {error}"))
+}
+
+pub fn session_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(session_path_in(&data_dir(app)?))
+}
+
+pub fn tmp_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    tmp_dir_in(&data_dir(app)?)
+}
+
+pub fn paths(app: &AppHandle) -> Result<AppPaths, String> {
+    let app_dir = exe_dir();
+    let data_directory = data_dir(app)?;
+    let tmp_dir = tmp_dir_in(&data_directory)?;
+    let session_file = session_path_in(&data_directory);
+    Ok(AppPaths {
+        app_dir: app_dir.to_string_lossy().to_string(),
+        data_dir: data_directory.to_string_lossy().to_string(),
+        tmp_dir: tmp_dir.to_string_lossy().to_string(),
+        session_file: session_file.to_string_lossy().to_string(),
+    })
+}
+
+pub fn load(app: &AppHandle) -> SessionState {
+    match data_dir(app) {
+        Ok(data_directory) => load_from_dir(&data_directory),
+        Err(_) => {
+            let mut session = SessionState {
+                config: import_legacy_config().unwrap_or_default(),
+                window: None,
+                layout: 0,
+            };
+            migrate_layout(&mut session);
+            session
+        }
+    }
+}
+
+pub fn save(app: &AppHandle, session: &SessionState) -> Result<(), String> {
+    save_to_dir(&data_dir(app)?, session)
 }
 
 /// A session written before the compact layout carries the large window bounds
@@ -148,6 +179,10 @@ fn migrate_layout(session: &mut SessionState) {
 
 /// Resolve the package that should be streamed to the device.
 pub fn resolve_pak_path(app: &AppHandle, config: &AppConfig) -> Result<PathBuf, String> {
+    resolve_pak_path_in(&data_dir(app)?, config)
+}
+
+pub fn resolve_pak_path_in(data_dir: &Path, config: &AppConfig) -> Result<PathBuf, String> {
     if config.use_local {
         let raw = config.file_path.trim();
         if raw.is_empty() {
@@ -160,7 +195,7 @@ pub fn resolve_pak_path(app: &AppHandle, config: &AppConfig) -> Result<PathBuf, 
             Ok(path)
         }
     } else {
-        Ok(tmp_dir(app)?.join(DEFAULT_PAK_NAME))
+        Ok(tmp_dir_in(data_dir)?.join(DEFAULT_PAK_NAME))
     }
 }
 

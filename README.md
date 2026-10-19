@@ -37,6 +37,79 @@ pnpm start               # 构建并启动 release 版
 
 也可以双击 `dev.bat`、`preview.bat` 或 `run.bat`。
 
+## 命令行与 AI 调用
+
+GUI 和 `netupdate-cli.exe` 共用同一套配置、FTP 下载和 TCP 升级代码。CLI 不带界面，
+适合脚本、批处理以及 AI 工具调用。
+
+构建：
+
+```powershell
+pnpm build:cli
+# 等价于
+cargo build --release --bin netupdate-cli --manifest-path src-tauri/Cargo.toml
+```
+
+产物位于 `src-tauri\target\release\netupdate-cli.exe`。
+
+常用命令：
+
+```powershell
+netupdate-cli.exe --help
+netupdate-cli.exe config
+netupdate-cli.exe upgrade --ip 172.16.10.110 --file Z:\UPDATE_AQ300.PAK --dry-run
+netupdate-cli.exe upgrade --ip 172.16.10.110 --file Z:\UPDATE_AQ300.PAK
+netupdate-cli.exe upgrade --ip 172.16.10.110 --ftp
+netupdate-cli.exe download --output D:\updates
+```
+
+`--file` 可以指向完整文件或目录，目录会自动拼接 `UPDATE_AQ300.PAK`。不传 `--ip`、
+`--file` 或 `--ftp` 时使用 `session.json` 中的配置。`--ftp-host`、`--ftp-user`、
+`--ftp-password`、`--ftp-folder` 只影响当次调用，不会写回配置文件。
+
+`--dry-run` 只检查 IP、文件是否存在以及文件大小，不会连接设备，适合在真正升级前做
+预检。实际升级成功返回 `0`，任何失败返回 `1`。
+
+### 机器可读输出
+
+加 `--json` 后，完整结果作为单行 JSON 输出到 stdout，日志和进度输出到 stderr：
+
+```powershell
+$result = netupdate-cli.exe --json upgrade --ip 172.16.10.110 --file Z:\UPDATE_AQ300.PAK --dry-run | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or -not $result.ok) { throw $result.error }
+```
+
+成功结果包含 `ok`、`operation`、`message`、`ip`、`file`、`bytes` 等字段；失败结果为
+`{"ok":false,"operation":"...","error":"..."}`。`config` 只返回 `ftpPasswordSet`，
+不会输出明文 FTP 密码。
+
+FTP 密码建议通过环境变量传入，避免出现在命令行历史和工具日志中：
+
+```powershell
+$env:NETUPDATE_FTP_PASSWORD = 'your-password'
+netupdate-cli.exe --json download --output D:\updates
+```
+
+### AI 工具调用建议
+
+首选方式是由 AI 直接执行 `netupdate-cli.exe --json ...`，读取 stdout 的 JSON 并检查
+退出码；这种方式无需额外服务，也便于在 Codex、脚本或 CI 中复用。
+
+如果需要稳定的工具接口，可以基于 CLI 再包一层 MCP server，提供
+`netupdate_config`、`netupdate_download`、`netupdate_upgrade` 三个工具，参数示例：
+
+```json
+{
+  "ip": "172.16.10.110",
+  "file": "Z:\\UPDATE_AQ300.PAK",
+  "ftp": false,
+  "dryRun": true
+}
+```
+
+工具描述中应要求 AI 在实际升级前先调用 `dryRun: true`，或取得用户明确确认，因为这会
+向真实设备推送升级包；FTP 密码应通过进程环境变量注入，不要作为工具参数记录。
+
 ## 数据与配置
 
 配置文件由 Rust 写入：
@@ -88,6 +161,8 @@ src/
   styles/                    主题令牌与界面样式
 src-tauri/src/
   lib.rs                     Tauri 命令、窗口几何恢复
+  cli.rs                     netupdate-cli 子命令与 JSON 输出
+  bin/netupdate-cli.rs       CLI 入口
   config.rs                  session.json、旧 config.ini 导入、路径解析
   upgrade.rs                 TCP 升级协议
   ftp.rs                     FTP 下载

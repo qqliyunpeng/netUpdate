@@ -1,5 +1,5 @@
-<#
-把 release 产物打成便携包（netupdate.exe + WebView2Loader.dll）。
+﻿<#
+把 release 产物打成便携包（netupdate.exe + netupdate-cli.exe + WebView2Loader.dll）。
 解压到任意目录即可运行，不需要安装。
 
 用法：
@@ -18,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $release = Join-Path $root 'src-tauri\target\release'
 $exe = Join-Path $release 'netupdate.exe'
+$cli = Join-Path $release 'netupdate-cli.exe'
 $loader = Join-Path $release 'WebView2Loader.dll'
 
 if (-not (Test-Path -LiteralPath $exe)) {
@@ -28,6 +29,22 @@ if (-not (Test-Path -LiteralPath $loader)) {
     throw "找不到 $loader，请先执行 pnpm tauri build"
 }
 
+if (-not (Test-Path -LiteralPath $cli)) {
+    Write-Host 'netupdate-cli.exe 不存在，先构建 CLI……'
+    Push-Location $root
+    try {
+        & cargo build --release --bin netupdate-cli --manifest-path src-tauri\Cargo.toml
+        if ($LASTEXITCODE -ne 0) {
+            throw "cargo build 失败（退出码 $LASTEXITCODE）"
+        }
+    } finally {
+        Pop-Location
+    }
+}
+if (-not (Test-Path -LiteralPath $cli)) {
+    throw "构建后仍找不到 $cli"
+}
+
 $config = Get-Content -LiteralPath (Join-Path $root 'src-tauri\tauri.conf.json') -Raw | ConvertFrom-Json
 if (-not $OutDir) { $OutDir = Join-Path $release 'bundle\portable' }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
@@ -35,6 +52,7 @@ New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 $stage = Join-Path $env:TEMP 'netupdate-portable-stage'
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Copy-Item -LiteralPath $exe -Destination $stage -Force
+Copy-Item -LiteralPath $cli -Destination $stage -Force
 Copy-Item -LiteralPath $loader -Destination $stage -Force
 
 $zip = Join-Path $OutDir ("netUpdate_{0}_x64-portable.zip" -f $config.version)

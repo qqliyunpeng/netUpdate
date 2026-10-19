@@ -49,13 +49,23 @@ pub async fn run(app: AppHandle, config: AppConfig) -> Result<String, String> {
     log(&app, format!("使用文件: {}", path.display()));
     let display_path = path.to_string_lossy().to_string();
     let background_app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || send_pak(&background_app, &path, &ip))
-        .await
-        .map_err(|error| format!("升级线程异常: {error}"))??;
+    tauri::async_runtime::spawn_blocking(move || {
+        send_pak(
+            &path,
+            &ip,
+            &mut |message| log(&background_app, message.to_string()),
+            &mut |bytes, total, percent| emit_progress(&background_app, bytes, total, percent),
+        )
+    })
+    .await
+    .map_err(|error| format!("升级线程异常: {error}"))??;
     Ok(display_path)
 }
 
-fn connect(app: &AppHandle, ip: &str) -> Result<TcpStream, String> {
+fn connect<L>(ip: &str, log: &mut L) -> Result<TcpStream, String>
+where
+    L: FnMut(&str),
+{
     let addresses = (ip, TCP_PORT)
         .to_socket_addrs()
         .map_err(|error| format!("无法解析主机地址 {ip}: {error}"))?
@@ -73,23 +83,29 @@ fn connect(app: &AppHandle, ip: &str) -> Result<TcpStream, String> {
                     let _ = stream.set_write_timeout(Some(Duration::from_secs(TCP_RECV_TIMEOUT_S)));
                     let _ =
                         stream.set_read_timeout(Some(Duration::from_secs(TCP_CONNECT_TIMEOUT_S)));
-                    log(app, format!("已连接到服务器: {ip}:{TCP_PORT}"));
+                    log(&format!("已连接到服务器: {ip}:{TCP_PORT}"));
                     return Ok(stream);
                 }
                 Err(error) => {
                     last_error = error.to_string();
-                    log(app, format!("连接出错: {error} 尝试第 {attempt} 次..."));
+                    log(&format!("连接出错: {error} 尝试第 {attempt} 次..."));
                 }
             }
         }
     }
 
     let message = format!("无法连接到服务器，已尝试 {TCP_CONNECT_ATTEMPTS} 次: {last_error}");
-    log(app, message.clone());
+    log(&message);
     Err(message)
 }
 
-fn send_pak(app: &AppHandle, path: &Path, ip: &str) -> Result<(), String> {
+/// Stream a PAK to the device. The GUI and CLI share this implementation; only
+/// the log and progress sinks differ.
+pub fn send_pak<L, P>(path: &Path, ip: &str, log: &mut L, progress: &mut P) -> Result<u64, String>
+where
+    L: FnMut(&str),
+    P: FnMut(u64, u64, f64),
+{
     let total = std::fs::metadata(path)
         .map_err(|error| format!("无法读取文件信息: {error}"))?
         .len();
@@ -101,7 +117,7 @@ fn send_pak(app: &AppHandle, path: &Path, ip: &str) -> Result<(), String> {
     }
 
     let mut file = File::open(path).map_err(|error| format!("无法打开升级包: {error}"))?;
-    let mut stream = connect(app, ip)?;
+    let mut stream = connect(ip, log)?;
     let mut buffer = vec![0_u8; PACKET_SIZE - HEAD_SIZE];
     let mut sent = 0_u64;
     let mut sequence = 0_u32;
@@ -128,7 +144,7 @@ fn send_pak(app: &AppHandle, path: &Path, ip: &str) -> Result<(), String> {
         let bucket = percent.floor() as i32;
         if bucket != last_percent {
             last_percent = bucket;
-            emit_progress(app, sent, total, percent);
+            progress(sent, total, percent);
         }
     }
 
@@ -136,8 +152,8 @@ fn send_pak(app: &AppHandle, path: &Path, ip: &str) -> Result<(), String> {
         return Err(format!("未能完整发送文件（{sent}/{total} 字节）"));
     }
 
-    log(app, "文件已发送完毕".to_string());
-    log(app, "等待更新完成标志...".to_string());
+    log("文件已发送完毕");
+    log("等待更新完成标志...");
     stream
         .set_read_timeout(Some(Duration::from_secs(TCP_RECV_TIMEOUT_S)))
         .map_err(|error| format!("设置接收超时失败: {error}"))?;
@@ -148,11 +164,11 @@ fn send_pak(app: &AppHandle, path: &Path, ip: &str) -> Result<(), String> {
         .map_err(|error| format!("等待设备响应失败: {error}"))?;
     let status = response_status(&response);
     if status == 0 {
-        log(app, "升级成功".to_string());
-        Ok(())
+        log("升级成功");
+        Ok(sent)
     } else {
         let message = format!("升级失败 (code={status})");
-        log(app, message.clone());
+        log(&message);
         Err(message)
     }
 }

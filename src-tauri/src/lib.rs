@@ -4,13 +4,14 @@
 //! dialogs and persistence live here so the frontend needs no filesystem or
 //! network permissions of its own.
 
-mod config;
-mod ftp;
+pub mod cli;
+pub mod config;
+pub mod ftp;
 mod metrics;
 #[cfg(windows)]
 mod shortcuts;
 mod theme;
-mod upgrade;
+pub mod upgrade;
 
 use std::sync::Mutex;
 

@@ -3,7 +3,7 @@
 use std::fs::File;
 use std::io::Write;
 use std::net::ToSocketAddrs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use suppaftp::{FtpError, FtpStream};
@@ -17,12 +17,12 @@ const FTP_PORT: u16 = 21;
 
 pub async fn download(app: AppHandle, config: AppConfig) -> Result<String, String> {
     let local_dir = config::tmp_dir(&app)?;
-    let local_path = local_dir.join(config::DEFAULT_PAK_NAME);
     let background_app = app.clone();
-    let background_path = local_path.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
-        download_blocking(&background_app, &config, &background_path)
+    let local_path = tauri::async_runtime::spawn_blocking(move || {
+        download_to_dir(&config, &local_dir, &mut |message| {
+            log(&background_app, message.to_string())
+        })
     })
     .await
     .map_err(|error| format!("FTP 线程异常: {error}"))??;
@@ -30,13 +30,31 @@ pub async fn download(app: AppHandle, config: AppConfig) -> Result<String, Strin
     Ok(local_path.to_string_lossy().to_string())
 }
 
-fn download_blocking(app: &AppHandle, config: &AppConfig, local_path: &Path) -> Result<(), String> {
+/// Download the update package into `local_dir`. Shared by the GUI and CLI.
+pub fn download_to_dir<L>(
+    config: &AppConfig,
+    local_dir: &Path,
+    log: &mut L,
+) -> Result<PathBuf, String>
+where
+    L: FnMut(&str),
+{
     if config.ftp_host.trim().is_empty() {
         return Err("FTP 主机地址为空".to_string());
     }
+    std::fs::create_dir_all(local_dir)
+        .map_err(|error| format!("无法创建下载目录 {}: {error}", local_dir.display()))?;
+    let local_path = local_dir.join(config::DEFAULT_PAK_NAME);
+    download_blocking(config, &local_path, log)?;
+    Ok(local_path)
+}
 
+fn download_blocking<L>(config: &AppConfig, local_path: &Path, log: &mut L) -> Result<(), String>
+where
+    L: FnMut(&str),
+{
     let host = config.ftp_host.trim();
-    log(app, format!("FTP: connecting to {host} ..."));
+    log(&format!("FTP: connecting to {host} ..."));
     let mut ftp = connect(host)?;
 
     let login = ftp
@@ -46,17 +64,17 @@ fn download_blocking(app: &AppHandle, config: &AppConfig, local_path: &Path) -> 
         let _ = ftp.quit();
         return Err(error);
     }
-    log(app, "FTP: login ok".to_string());
+    log("FTP: login ok");
 
     let folder = config.ftp_folder.trim();
     if !folder.is_empty() && folder != "/" {
         ftp.cwd(folder)
             .map_err(|error| format!("FTP 切换目录失败: {error}"))?;
     }
-    log(
-        app,
-        format!("FTP: downloading {} ...", config::DEFAULT_PAK_NAME),
-    );
+    log(&format!(
+        "FTP: downloading {} ...",
+        config::DEFAULT_PAK_NAME
+    ));
 
     let mut file = File::create(local_path)
         .map_err(|error| format!("无法创建本地文件 {}: {error}", local_path.display()))?;
@@ -76,10 +94,10 @@ fn download_blocking(app: &AppHandle, config: &AppConfig, local_path: &Path) -> 
                 .map_err(FtpError::ConnectionError)?;
             downloaded += read as u64;
             if downloaded >= next_report {
-                log(
-                    app,
-                    format!("FTP: 已下载 {:.1} MiB", downloaded as f64 / 1_048_576.0),
-                );
+                log(&format!(
+                    "FTP: 已下载 {:.1} MiB",
+                    downloaded as f64 / 1_048_576.0
+                ));
                 next_report += 16_u64 * 1024 * 1024;
             }
         }
@@ -93,7 +111,7 @@ fn download_blocking(app: &AppHandle, config: &AppConfig, local_path: &Path) -> 
     }
 
     let _ = ftp.quit();
-    log(app, format!("FTP: saved to {}", local_path.display()));
+    log(&format!("FTP: saved to {}", local_path.display()));
     Ok(())
 }
 
