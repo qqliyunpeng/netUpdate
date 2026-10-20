@@ -23,14 +23,29 @@ function Svg({ size = 16, className, children }: IconProps & { children: React.R
   );
 }
 
-/** App mark: an upgrade package moving to a device. */
+/** App mark: the upload arrow on its cyan tile, matching the window icon. */
 export function Mark({ size = 16 }: IconProps) {
   return (
-    <Svg size={size}>
-      <path d="M8 1.8v8.4" />
-      <path d="M4.8 6.9L8 3.7l3.2 3.2" />
-      <path d="M3.2 11.5h9.6v2.2H3.2z" />
-    </Svg>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect width="24" height="24" fill="#00b7c3" />
+      <g
+        fill="none"
+        stroke="#000000"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 4v10" />
+        <path d="M8.8 9.8L12 6.4l3.2 3.4" />
+        <rect x={7} y={14.2} width={10} height={2.6} rx={0.2} />
+      </g>
+    </svg>
   );
 }
 
