@@ -22,10 +22,14 @@ jobs:
           - name: Linux x64
             platform: ubuntu-22.04
             args: "--bundles deb,appimage"
-          - name: macOS Universal
+          - name: macOS Apple Silicon
             platform: macos-latest
-            args: "--target universal-apple-darwin --bundles dmg,app"
-            targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+            args: "--target aarch64-apple-darwin --bundles dmg,app"
+            targets: "aarch64-apple-darwin"
+          - name: macOS Intel
+            platform: macos-latest
+            args: "--target x86_64-apple-darwin --bundles dmg,app"
+            targets: "x86_64-apple-darwin"
 
     steps:
       - uses: actions/checkout@v4
