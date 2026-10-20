@@ -19,6 +19,8 @@ pub const TCP_PORT: u16 = 9000;
 pub const TCP_CONNECT_TIMEOUT_S: u64 = 12;
 pub const TCP_CONNECT_ATTEMPTS: usize = 3;
 pub const TCP_RECV_TIMEOUT_S: u64 = 120;
+pub const REACHABILITY_TIMEOUT_MS: u64 = 3000;
+pub const UNREACHABLE_MESSAGE: &str = "目标 IP 不可达，取消升级";
 pub const PACKET_SIZE: usize = 4096;
 pub const HEAD_SIZE: usize = 32;
 pub const RESP_SIZE: usize = 36;
@@ -32,16 +34,18 @@ pub struct ProgressUpdate {
 }
 
 pub async fn run(app: AppHandle, config: AppConfig) -> Result<String, String> {
-    let path = config::resolve_pak_path(&app, &config)?;
-    if !path.is_file() {
-        let message = format!("升级失败: 文件不存在 {}", path.display());
+    let ip = config.ip.trim().to_string();
+    if ip.is_empty() {
+        let message = "升级失败: 主机 IP 为空".to_string();
         log(&app, message.clone());
         return Err(message);
     }
 
-    let ip = config.ip.trim().to_string();
-    if ip.is_empty() {
-        let message = "升级失败: 主机 IP 为空".to_string();
+    check_reachable(&ip, &mut |message| log(&app, message.to_string()))?;
+
+    let path = config::resolve_pak_path(&app, &config)?;
+    if !path.is_file() {
+        let message = format!("升级失败: 文件不存在 {}", path.display());
         log(&app, message.clone());
         return Err(message);
     }
@@ -60,6 +64,50 @@ pub async fn run(app: AppHandle, config: AppConfig) -> Result<String, String> {
     .await
     .map_err(|error| format!("升级线程异常: {error}"))??;
     Ok(display_path)
+}
+
+/// Quick preflight check before any upgrade work starts.
+///
+/// The device must accept a TCP connection on the upgrade port. Anything else
+/// (resolving the PAK path, downloading from FTP, streaming data) is skipped
+/// when this fails, so an unreachable target cannot cause a long pointless run.
+pub fn check_reachable<L>(ip: &str, log: &mut L) -> Result<(), String>
+where
+    L: FnMut(&str),
+{
+    let ip = ip.trim();
+    if ip.is_empty() {
+        return Err(UNREACHABLE_MESSAGE.to_string());
+    }
+
+    probe(
+        ip,
+        TCP_PORT,
+        Duration::from_millis(REACHABILITY_TIMEOUT_MS),
+        log,
+    )
+}
+
+fn probe<L>(ip: &str, port: u16, timeout: Duration, log: &mut L) -> Result<(), String>
+where
+    L: FnMut(&str),
+{
+    let addresses = (ip, port)
+        .to_socket_addrs()
+        .map_err(|_| UNREACHABLE_MESSAGE.to_string())?
+        .collect::<Vec<_>>();
+    if addresses.is_empty() {
+        return Err(UNREACHABLE_MESSAGE.to_string());
+    }
+
+    for address in &addresses {
+        if TcpStream::connect_timeout(address, timeout).is_ok() {
+            log(&format!("目标 IP 可达: {ip}:{port}"));
+            return Ok(());
+        }
+    }
+
+    Err(UNREACHABLE_MESSAGE.to_string())
 }
 
 fn connect<L>(ip: &str, log: &mut L) -> Result<TcpStream, String>
@@ -229,5 +277,48 @@ mod tests {
         let mut response = [0_u8; RESP_SIZE];
         response[32..36].copy_from_slice(&42_u32.to_le_bytes());
         assert_eq!(response_status(&response), 42);
+    }
+
+    #[test]
+    fn an_empty_target_is_rejected_before_connecting() {
+        let mut messages = Vec::new();
+        let error = check_reachable("  ", &mut |message| messages.push(message.to_string()))
+            .expect_err("empty ip must fail");
+        assert_eq!(error, UNREACHABLE_MESSAGE);
+        assert!(messages.is_empty());
+    }
+
+    #[test]
+    fn probe_accepts_a_listening_port() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let accept = std::thread::spawn(move || {
+            let _ = listener.accept();
+        });
+        let mut messages = Vec::new();
+        probe("127.0.0.1", port, Duration::from_secs(1), &mut |message| {
+            messages.push(message.to_string())
+        })
+        .expect("listening port is reachable");
+        assert!(messages
+            .iter()
+            .any(|message| message.contains("目标 IP 可达")));
+        accept.join().expect("accept thread");
+    }
+
+    #[test]
+    fn probe_rejects_a_closed_port() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        drop(listener);
+        let mut messages = Vec::new();
+        let error = probe(
+            "127.0.0.1",
+            port,
+            Duration::from_millis(500),
+            &mut |message| messages.push(message.to_string()),
+        )
+        .expect_err("closed port must fail");
+        assert_eq!(error, UNREACHABLE_MESSAGE);
     }
 }

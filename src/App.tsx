@@ -30,6 +30,7 @@ import {
 const BUILD_TIME = "2026.10.19";
 const SAVE_DELAY = 500;
 const MAX_LOG_LINES = 1200;
+const UNREACHABLE_MESSAGE = "目标 IP 不可达，取消升级";
 
 type Busy = "upgrade" | "download" | null;
 type ModalState =
@@ -228,7 +229,7 @@ export default function App() {
     } catch (error) {
       const message = errorText(error);
       setProgress(null);
-      appendLog(`操作失败: ${message}`);
+      appendLog(message === UNREACHABLE_MESSAGE ? message : `操作失败: ${message}`);
     } finally {
       setBusy(null);
       void persist();

@@ -176,6 +176,10 @@ fn dispatch(cli: &Cli) -> Result<Value, String> {
                 return Err("主机 IP 为空".to_string());
             }
 
+            if !args.dry_run {
+                upgrade::check_reachable(&ip, &mut log_to_stderr)?;
+            }
+
             let path = if args.ftp {
                 let download_dir = config::tmp_dir_in(&data_dir)?;
                 ftp::download_to_dir(&settings, &download_dir, &mut log_to_stderr)?
