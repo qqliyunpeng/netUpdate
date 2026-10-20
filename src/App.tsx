@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MenuBar, type MenuDefinition } from "./components/MenuBar";
 import { Modal } from "./components/Modal";
-import { StatusBar } from "./components/StatusBar";
 import { TabBar, type TabKey } from "./components/TabBar";
 import { TitleBar } from "./components/TitleBar";
 import { UpgradePage } from "./components/UpgradePage";
@@ -58,7 +57,6 @@ export default function App() {
   const [progress, setProgress] = useState<number | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [ftpOpen, setFtpOpen] = useState(false);
-  const [status, setStatus] = useState("正在载入配置…");
   const [modal, setModal] = useState<ModalState | null>(null);
 
   const configRef = useRef(config);
@@ -171,7 +169,6 @@ export default function App() {
       }
       if (appPaths) setPaths(appPaths);
       setReady(true);
-      setStatus("就绪");
       if (!startupLogged.current) {
         startupLogged.current = true;
         appendLog(`netUpdate v${__APP_VERSION__} 已启动`);
@@ -204,7 +201,6 @@ export default function App() {
 
   const handleModeChange = useCallback((useLocal: boolean) => {
     setConfig((previous) => ({ ...previous, useLocal }));
-    setStatus(useLocal ? "已切换到本地文件" : "已切换到 FTP 拉取");
   }, []);
 
   const handleSelectPak = useCallback(async () => {
@@ -212,7 +208,6 @@ export default function App() {
       const path = await selectPakFile();
       if (!path) return;
       setConfig((previous) => ({ ...previous, filePath: path, useLocal: true }));
-      setStatus("已选择 PAK 文件");
       appendLog(`已选择 PAK: ${path}`);
     } catch (error) {
       const message = errorText(error);
@@ -225,17 +220,14 @@ export default function App() {
     if (busy !== null) return;
     setBusy("upgrade");
     setProgress(0);
-    setStatus("正在升级…");
     setTab("network");
     appendLog("开始升级");
     try {
       await startUpgrade(config);
       setProgress(100);
-      setStatus("升级完成");
     } catch (error) {
       const message = errorText(error);
       setProgress(null);
-      setStatus("升级失败");
       appendLog(`操作失败: ${message}`);
     } finally {
       setBusy(null);
@@ -247,29 +239,19 @@ export default function App() {
     if (busy !== null) return;
     setBusy("download");
     setProgress(null);
-    setStatus("正在从 FTP 下载…");
     setTab("network");
     appendLog("开始从 FTP 下载升级文件");
     try {
       const path = await downloadPak(config);
-      setStatus("FTP 下载完成");
       appendLog(`FTP 下载完成: ${path}`);
     } catch (error) {
       const message = errorText(error);
-      setStatus("FTP 下载失败");
       appendLog(`FTP 下载失败: ${message}`);
     } finally {
       setBusy(null);
       void persist();
     }
   }, [appendLog, busy, config, persist]);
-
-  const handleToggleTheme = useCallback(() => {
-    setConfig((previous) => ({
-      ...previous,
-      theme: previous.theme === "dark" ? "light" : "dark",
-    }));
-  }, []);
 
   const handleOpenAppDirectory = useCallback(async () => {
     if (!isTauri) {
@@ -447,13 +429,6 @@ export default function App() {
           </section>
         )}
       </div>
-      <StatusBar
-        message={status}
-        busy={busy !== null}
-        darkMode={config.theme === "dark"}
-        configPath={paths?.sessionFile ?? ""}
-        onToggleTheme={handleToggleTheme}
-      />
       {modalNode}
     </div>
   );

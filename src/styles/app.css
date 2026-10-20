@@ -65,7 +65,7 @@ textarea {
 
 .app {
   display: grid;
-  grid-template-rows: var(--titlebar-h, 38px) auto auto minmax(0, 1fr) 24px;
+  grid-template-rows: var(--titlebar-h, 38px) auto auto minmax(0, 1fr);
   height: 100%;
   background-image: var(--bg-grain);
   background-attachment: fixed;
@@ -670,24 +670,6 @@ input:disabled {
   padding: 8px;
 }
 
-.log-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.log-head h2 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.log-head p {
-  display: none;
-}
-
 .log-text {
   flex: 1;
   width: 100%;
@@ -741,16 +723,6 @@ input:disabled {
   animation: stripe 0.8s linear infinite;
 }
 
-.progress-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 2px;
-  color: var(--ink-3);
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-}
-
 /* -------------------------------- empty page ------------------------------ */
 
 .empty-card {
@@ -774,65 +746,6 @@ input:disabled {
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-pop);
-}
-
-/* --------------------------------- statusbar ------------------------------ */
-
-.statusbar {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 8px;
-  border-top: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 74%, transparent);
-  font-size: 11.5px;
-  color: var(--ink-2);
-}
-
-.status-dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 14%, transparent);
-}
-
-.status-dot[data-busy="true"] {
-  background: var(--warn);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 17%, transparent);
-  animation: pulse 1.2s var(--ease) infinite;
-}
-
-.status-msg {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.status-config {
-  max-width: 40%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ink-3);
-  font-size: 10.5px;
-}
-
-.status-theme {
-  flex: none;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  color: var(--ink-3);
-  font-size: 12px;
-}
-
-.status-theme:hover {
-  background: var(--panel-3);
-  color: var(--ink);
 }
 
 /* ---------------------------------- modal --------------------------------- */
@@ -917,9 +830,6 @@ input:disabled {
     padding: 12px;
   }
 
-  .status-config {
-    display: none;
-  }
 }
 
 @media (max-width: 460px) {
