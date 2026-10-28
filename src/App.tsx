@@ -28,7 +28,7 @@ import {
   type SessionState,
 } from "./lib/types";
 
-const BUILD_TIME = "2026.10.19";
+const BUILD_TIME = "2026.10.28";
 const SAVE_DELAY = 500;
 const MAX_LOG_LINES = 1200;
 
