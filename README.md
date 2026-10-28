@@ -1,73 +1,97 @@
-# netUpdate · AQ300 网络升级工具
+# netUpdate
 
-这是 `D:\work_nvme\python_learn\pyside6\02.auto_tools` 的 Tauri 重写版。界面与
-`D:\work_nvme\tauri`（noteCalc）保持同一套窗口和交互骨架：
+netUpdate 是面向 AQ300 设备的网络升级工具。它可以把本地 PAK 文件或从 FTP
+下载的升级包，通过一条 TCP 连接发送到设备，并在界面中实时显示进度和日志。
 
-- 无边框窗口 + 自绘标题栏，默认窗口为紧凑的 370 × 380（最小 360 × 370），
-  沿用 noteCalc 的 `decorations: false`、居中启动、可缩放、启动时隐藏后再显示。
-- 标题栏跟随窗口焦点、Windows 系统强调色和系统标题栏高度；菜单栏、页签高度由 Rust
-  侧读取系统度量后注入 CSS。
-- 全局禁用 WebView 默认右键菜单；输入框使用自绘的“撤销 / 重做 / 剪切 / 复制 / 粘贴 /
-  全选”菜单，日志区使用“复制 / 全选 / 清空显示”菜单，菜单会自动避让窗口边缘。
-- 配置、窗口位置和窗口尺寸会持久化；关闭窗口时再次落盘。
+项目基于 Tauri 2、React 和 Rust，提供桌面界面，以及可脚本化的
+`netupdate-cli` 命令行工具。
+
+<p align="center">
+  <img src="docs/images/netupdate.png" width="360" alt="netUpdate 主界面">
+</p>
 
 ## 功能
 
-- 本地文件升级：PAK 路径可以指向完整文件，也可以指向目录，目录会自动拼接
+- 支持本地文件和 FTP 文件两种升级方式。
+- 本地路径可以是完整 PAK 文件，也可以是目录；目录会自动拼接
   `UPDATE_AQ300.PAK`。
-- FTP 拉取：通过 `suppaftp` 从 FTP 后台下载 `UPDATE_AQ300.PAK`，不占用界面线程，
-  文件保存到应用数据目录的 `tmp/` 下。
-- TCP 升级：向 `<设备 IP>:9000` 分块发送 PAK，协议与 Python 版一致：
-  - 32 字节小端头，分包 4096 字节；
-  - 连接超时 12 秒、最多 3 次；前几次重试使用较短超时，最后一次使用完整超时；
-    设备响应等待 120 秒；
-  - 响应 36 字节，最后一个 `u32` 为状态码，`0` 表示成功。
-  - 点击“协议”首先显示传输参数（端口、分包、超时、重试）；再通过
-    “配置发送协议”“配置接收协议”打开大窗口调整魔数、类型和状态码偏移，
-    默认值与 Python 版一致。
-  - “协议”按钮悬停可查看当前参数摘要；弹窗顶部显示当前生效值，各字段标注默认值，
-    参数偏离默认时按钮上会出现小圆点提示。
-- 单连接升级：可达性判断与实际发送复用同一条 TCP 连接，连接失败时按配置重试。
-  不再先探测再重连，避免设备只允许一个连接时出现“探测成功、正式连接连续失败后才
-  恢复”的问题。设备升级后短暂重启时，短超时重试会尽快接回，日志会记录每次尝试的
-  耗时。
-- 协议可视化：发送 / 接收窗口以表格展示字节偏移、类型和当前值，修改后的参数随
-  `session.json` 持久化。
-- 实时日志、进度条、Alt+U 快捷升级、FTP 设置弹窗、浅色 / 深色主题、关于和打开程序目录。
-- 保留原工具的“网络升级”和“鼠标操作”两个页签；原版“鼠标操作”页没有业务控件，
-  这里保留为说明页。
+- 升级和可达性检查复用同一条 TCP 连接，连接失败时按配置重试。
+- 实时日志、传输进度、浅色 / 深色主题和 `Alt+U` 快捷升级。
+- 可在界面中调整端口、分包大小、魔数、类型、状态码偏移和超时参数。
+- 附带 `netupdate-cli.exe`，支持脚本调用、`--dry-run` 预检和单行 JSON 输出。
 
-## 运行
+## 快速开始
 
-```bash
+### 直接使用
+
+从 [GitHub Releases](https://github.com/qqliyunpeng/netUpdate/releases) 下载
+对应平台的安装包。Windows 安装包会在需要时引导安装 WebView2；使用便携包时，
+系统需要已有 WebView2 运行时。
+
+### 本地开发
+
+需要 Node.js 22、pnpm 和 Rust 1.82 或更高版本，并安装对应平台的
+[Tauri 开发依赖](https://v2.tauri.app/start/prerequisites/)。Windows 上还需要
+WebView2。
+
+```powershell
+corepack enable
 pnpm install
-pnpm dev                 # 浏览器预览，只调界面；不能执行网络升级
-pnpm tauri dev           # 开发版窗口
-pnpm tauri build --no-bundle
-pnpm start               # 构建并启动 release 版
+pnpm tauri dev
 ```
 
-也可以双击 `dev.bat`、`preview.bat` 或 `run.bat`。
+Windows 也可以双击 `dev.bat` 进入开发模式，或双击 `preview.bat` 只预览界面。
 
-## 命令行与 AI 调用
+### 构建
 
-GUI 和 `netupdate-cli.exe` 共用同一套配置、FTP 下载和 TCP 升级代码。CLI 不带界面，
-适合脚本、批处理以及 AI 工具调用。
+```powershell
+pnpm build                 # 只检查并构建前端
+pnpm tauri build           # 构建桌面安装包
+pnpm start                 # 按需构建并启动 release 版
+pnpm portable              # 生成便携包（需先完成 tauri build）
+pnpm build:cli             # 构建 netupdate-cli.exe
+```
 
-构建：
+## 使用
+
+1. 选择“本地文件”或“FTP 文件”作为升级方式。
+2. 本地文件可填写完整路径或目录；FTP 模式可先打开“FTP 设置”保存服务器信息。
+3. 填写设备 IP。需要时点击“协议”检查或调整传输参数。
+4. 点击“升级”，或按 `Alt+U` 开始。FTP 模式可先点击“FTP 获取”下载升级包。
+
+升级过程中会显示发送进度和设备日志。升级完成后设备可能短暂重启，这是正常现象。
+程序会在连接失败时按“连接重试次数”逐次重连；每次尝试只建立一条业务连接，升级前
+不会额外探测端口。
+
+默认协议参数如下，可在“协议”窗口中修改：
+
+| 参数 | 默认值 |
+| --- | --- |
+| 端口 | `9000` |
+| 分包大小 | `4096` 字节 |
+| 魔数 | `0x9000` |
+| 包类型 | `0x0002` |
+| 状态码偏移 | `32` |
+| 连接超时 / 重试 | `12` 秒 / `3` 次 |
+| 设备响应超时 | `120` 秒 |
+
+“鼠标操作”页签是原工具的占位页面，实际升级功能都在“网络升级”页签。
+
+## 命令行
+
+`netupdate-cli.exe` 与 GUI 共用配置、FTP 下载和 TCP 升级代码，适合在批处理、
+脚本和自动化工具中使用。
 
 ```powershell
 pnpm build:cli
-# 等价于
-cargo build --release --bin netupdate-cli --manifest-path src-tauri/Cargo.toml
+.\src-tauri\target\release\netupdate-cli.exe --help
 ```
 
-产物位于 `src-tauri\target\release\netupdate-cli.exe`。
+以下命令假设已将 release 目录加入 `PATH`；否则请使用完整路径。
 
 常用命令：
 
 ```powershell
-netupdate-cli.exe --help
 netupdate-cli.exe config
 netupdate-cli.exe upgrade --ip 172.16.10.110 --file Z:\UPDATE_AQ300.PAK --dry-run
 netupdate-cli.exe upgrade --ip 172.16.10.110 --file Z:\UPDATE_AQ300.PAK
@@ -75,120 +99,58 @@ netupdate-cli.exe upgrade --ip 172.16.10.110 --ftp
 netupdate-cli.exe download --output D:\updates
 ```
 
-`--file` 可以指向完整文件或目录，目录会自动拼接 `UPDATE_AQ300.PAK`。不传 `--ip`、
-`--file` 或 `--ftp` 时使用 `session.json` 中的配置。`--ftp-host`、`--ftp-user`、
-`--ftp-password`、`--ftp-folder` 只影响当次调用，不会写回配置文件。
+- 不传 `--ip`、`--file` 或 `--ftp` 时，使用 `session.json` 中的配置。
+- `--ftp-host`、`--ftp-user`、`--ftp-password`、`--ftp-folder` 只影响当前调用。
+- `--data-dir` 可临时覆盖配置和临时文件所在的目录。
+- `--dry-run` 只检查 IP、文件是否存在和文件大小，不连接设备。
+- 实际升级成功返回 `0`，失败返回 `1`。
 
-`--dry-run` 只检查 IP、文件是否存在以及文件大小，不会连接设备，适合在真正升级前做
-预检。实际升级只建立一条 TCP 连接，这条连接既用于可达性判断，也直接用于发送数据；
-连接失败时按 `connectAttempts` 重试。`--ftp` 会先下载再连接设备，因此目标不可达时
-下载仍可能先完成。实际升级成功返回 `0`，任何失败返回 `1`。
-
-### 机器可读输出
-
-加 `--json` 后，完整结果作为单行 JSON 输出到 stdout，日志和进度输出到 stderr：
+需要在脚本中解析结果时，使用全局 `--json` 参数。完整结果输出到 stdout，日志和进度
+输出到 stderr：
 
 ```powershell
-$result = netupdate-cli.exe --json upgrade --ip 172.16.10.110 --file Z:\UPDATE_AQ300.PAK --dry-run | ConvertFrom-Json
+$result = netupdate-cli.exe --json upgrade `
+  --ip 172.16.10.110 --file Z:\UPDATE_AQ300.PAK --dry-run | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0 -or -not $result.ok) { throw $result.error }
 ```
 
-成功结果包含 `ok`、`operation`、`message`、`ip`、`file`、`bytes` 等字段；失败结果为
-`{"ok":false,"operation":"...","error":"..."}`。`config` 只返回 `ftpPasswordSet`，
-不会输出明文 FTP 密码。
-
-FTP 密码建议通过环境变量传入，避免出现在命令行历史和工具日志中：
+为避免密码出现在命令历史和日志中，建议通过环境变量传入 FTP 密码：
 
 ```powershell
 $env:NETUPDATE_FTP_PASSWORD = 'your-password'
 netupdate-cli.exe --json download --output D:\updates
 ```
 
-### AI 工具调用建议
+## 配置与数据
 
-首选方式是由 AI 直接执行 `netupdate-cli.exe --json ...`，读取 stdout 的 JSON 并检查
-退出码；这种方式无需额外服务，也便于在 Codex、脚本或 CI 中复用。
-
-如果需要稳定的工具接口，可以基于 CLI 再包一层 MCP server，提供
-`netupdate_config`、`netupdate_download`、`netupdate_upgrade` 三个工具，参数示例：
-
-```json
-{
-  "ip": "172.16.10.110",
-  "file": "Z:\\UPDATE_AQ300.PAK",
-  "ftp": false,
-  "dryRun": true
-}
-```
-
-工具描述中应要求 AI 在实际升级前先调用 `dryRun: true`，或取得用户明确确认，因为这会
-向真实设备推送升级包；FTP 密码应通过进程环境变量注入，不要作为工具参数记录。
-
-## 数据与配置
-
-配置文件由 Rust 写入：
+配置保存在各平台的应用数据目录中。Windows 下的位置是：
 
 ```text
 %APPDATA%\com.localtools.netupdate\session.json
-```
-
-FTP 下载文件：
-
-```text
 %APPDATA%\com.localtools.netupdate\tmp\UPDATE_AQ300.PAK
 ```
 
-首次启动时如果没有 `session.json`，程序会在可执行文件目录和当前工作目录查找旧版
-`config.ini` 并导入以下字段：
+`session.json` 保存升级方式、路径、设备 IP、FTP 设置、协议参数、主题和窗口位置。
+首次启动时若没有该文件，程序会尝试从可执行文件目录或当前目录的旧版 `config.ini`
+导入配置。
 
-```ini
-[DEFAULT]
-ip = 172.16.10.110
-file_path = Z:/UPDATE_AQ300.PAK
-ftp_host = 172.16.9.6
-ftp_usrName = lyp
-ftp_passwd = 123456
-ftp_folder = /
-use_local = 1
-theme = dark
-```
+FTP 密码和旧版工具一样以明文保存在本地配置中。请只在受控环境中使用，并妥善限制
+配置文件的访问权限。
 
-`use_local = 1` 使用本地文件，`0` 使用 FTP 拉取的文件。FTP 密码和原版一样以明文保存在
-配置中，建议只在受控环境使用。
-
-## 代码结构
+## 项目结构
 
 ```text
-src/
-  App.tsx                    会话、快捷键、菜单、升级流程
-  components/
-    TitleBar.tsx             自绘标题栏（焦点/系统强调色/最大化）
-    MenuBar.tsx              应用菜单
-    EditContextMenu.tsx      输入框与只读日志共用的右键菜单
-    EditInput.tsx            带右键菜单的输入框
-    UpgradePage.tsx          升级配置与日志布局
-    LogView.tsx              只读日志、进度条、清空动作
-    TabBar.tsx               两个功能页签
-    StatusBar.tsx            状态栏
-  lib/ipc.ts                 Tauri invoke / 事件 / 窗口 API 与预览降级
-  lib/types.ts               前后端共享的数据形状
-  styles/                    主题令牌与界面样式
-src-tauri/src/
-  lib.rs                     Tauri 命令、窗口几何恢复
-  cli.rs                     netupdate-cli 子命令与 JSON 输出
-  bin/netupdate-cli.rs       CLI 入口
-  config.rs                  session.json、旧 config.ini 导入、路径解析
-  upgrade.rs                 TCP 升级协议
-  ftp.rs                     FTP 下载
-  metrics.rs                 系统窗口度量
-  theme.rs                   系统标题栏配色
-  shortcuts.rs               WebView2 快捷键处理
+src/                      React 界面和 Tauri 前端桥接
+src-tauri/src/            Rust 后端、升级协议、FTP、配置和 CLI
+src-tauri/tauri.conf.json 窗口、打包和安装配置
+scripts/                  开发启动、链接器修复和便携包脚本
+docs/images/              README 图片
 ```
 
 ## 说明
 
-- 前端不直接读文件或发网络请求；文件对话框、FTP、TCP 和配置读写都在 Rust 侧完成。
-- 浏览器预览模式会显示“浏览器预览 · 升级操作不可用”，升级和 FTP 按钮禁用。
-- 与原 Python 版相比，窗口改为 noteCalc 风格的无边框自绘窗口，配置由 `config.ini`
-  改为应用数据目录下的 `session.json`（仍支持旧文件导入），并增加了 FTP 设置面板、
-  传输进度和日志右键菜单。
+- `pnpm dev` 只启动浏览器预览，不会连接 FTP 或升级设备；完整功能请使用
+  `pnpm tauri dev` 或 release 版。
+- 本仓库中的 `.bat` 和 `.ps1` 启动脚本面向 Windows；桌面程序本身由 CI 同时构建
+  Windows、Linux 和 macOS 版本。
+- 如需修改代码或让自动化代理参与开发，请先阅读 `AGENTS.md`。
