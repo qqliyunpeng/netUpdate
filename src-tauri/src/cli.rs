@@ -176,9 +176,10 @@ fn dispatch(cli: &Cli) -> Result<Value, String> {
                 return Err("主机 IP 为空".to_string());
             }
 
-            if !args.dry_run {
-                upgrade::check_reachable(&ip, &mut log_to_stderr)?;
-            }
+            settings
+                .protocol
+                .validate()
+                .map_err(|error| format!("协议参数无效: {error}"))?;
 
             let path = if args.ftp {
                 let download_dir = config::tmp_dir_in(&data_dir)?;
@@ -217,6 +218,7 @@ fn dispatch(cli: &Cli) -> Result<Value, String> {
             let sent = upgrade::send_pak(
                 &path,
                 &ip,
+                &settings.protocol,
                 &mut log_to_stderr,
                 &mut |bytes, total, percent| {
                     let decile = (percent / 10.0).floor() as i32;
@@ -256,7 +258,8 @@ fn config_payload(config: &AppConfig) -> Value {
         "ftpPasswordSet": !config.ftp_password.is_empty(),
         "ftpFolder": config.ftp_folder,
         "useLocal": config.use_local,
-        "theme": config.theme
+        "theme": config.theme,
+        "protocol": config.protocol
     })
 }
 

@@ -1,6 +1,10 @@
+import { useEffect, useState } from "react";
 import { EditInput } from "./EditInput";
 import { LogView } from "./LogView";
 import { Modal } from "./Modal";
+import { ProtocolModal } from "./ProtocolModal";
+import { isDefaultProtocol, protocolSummary } from "../lib/protocol";
+import { setProtocolWindowExpanded } from "../lib/ipc";
 import type { AppConfig, AppPaths } from "../lib/types";
 
 type Busy = "upgrade" | "download" | null;
@@ -38,9 +42,19 @@ export function UpgradePage({
   onDownload,
   onClearLog,
 }: UpgradePageProps) {
+  const [protocolOpen, setProtocolOpen] = useState(false);
   const blocked = busy !== null || !tauri;
   const localReady = config.useLocal ? config.filePath.trim().length > 0 : true;
   const canUpgrade = tauri && !blocked && config.ip.trim().length > 0 && localReady;
+  const protocolCustom = !isDefaultProtocol(config.protocol);
+
+  useEffect(() => {
+    if (!protocolOpen) return;
+    void setProtocolWindowExpanded(true);
+    return () => {
+      void setProtocolWindowExpanded(false);
+    };
+  }, [protocolOpen]);
 
   return (
     <section className="workspace compact" aria-label="AQ300 网络升级">
@@ -126,6 +140,16 @@ export function UpgradePage({
           </button>
           <button
             type="button"
+            className="btn small ghost"
+            disabled={busy !== null}
+            title={`配置升级协议\n当前：${protocolSummary(config.protocol)}`}
+            onClick={() => setProtocolOpen(true)}
+          >
+            <span>协议</span>
+            {protocolCustom ? <i className="proto-dot" aria-hidden="true" /> : null}
+          </button>
+          <button
+            type="button"
             className="btn small primary"
             disabled={!canUpgrade}
             onClick={onUpgrade}
@@ -191,6 +215,18 @@ export function UpgradePage({
           </div>
           <p className="hint modal-hint">下载目录：{paths?.tmpDir ?? "正在读取…"}</p>
         </Modal>
+      ) : null}
+
+      {protocolOpen ? (
+        <ProtocolModal
+          protocol={config.protocol}
+          busy={busy !== null}
+          onDismiss={() => setProtocolOpen(false)}
+          onSave={(protocol) => {
+            onConfigChange({ protocol });
+            setProtocolOpen(false);
+          }}
+        />
       ) : null}
     </section>
   );

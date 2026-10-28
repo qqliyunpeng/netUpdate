@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
+use crate::upgrade::ProtocolSettings;
+
 pub const DEFAULT_FTP_HOST: &str = "172.16.9.6";
 pub const DEFAULT_FTP_USERNAME: &str = "lyp";
 pub const DEFAULT_FTP_PASSWORD: &str = "123456";
@@ -30,6 +32,7 @@ pub struct AppConfig {
     pub ftp_folder: String,
     pub use_local: bool,
     pub theme: String,
+    pub protocol: ProtocolSettings,
 }
 
 impl Default for AppConfig {
@@ -43,6 +46,7 @@ impl Default for AppConfig {
             ftp_folder: "/".to_string(),
             use_local: true,
             theme: "dark".to_string(),
+            protocol: ProtocolSettings::default(),
         }
     }
 }

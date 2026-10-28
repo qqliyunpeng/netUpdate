@@ -22,6 +22,7 @@ import {
 } from "./lib/ipc";
 import {
   DEFAULT_CONFIG,
+  DEFAULT_PROTOCOL,
   type AppConfig,
   type AppPaths,
   type SessionState,
@@ -30,7 +31,6 @@ import {
 const BUILD_TIME = "2026.10.19";
 const SAVE_DELAY = 500;
 const MAX_LOG_LINES = 1200;
-const UNREACHABLE_MESSAGE = "目标 IP 不可达，取消升级";
 
 type Busy = "upgrade" | "download" | null;
 type ModalState =
@@ -165,6 +165,7 @@ export default function App() {
         setConfig({
           ...DEFAULT_CONFIG,
           ...session.config,
+          protocol: { ...DEFAULT_PROTOCOL, ...session.config?.protocol },
           theme: session.config?.theme === "light" ? "light" : "dark",
         });
       }
@@ -229,7 +230,7 @@ export default function App() {
     } catch (error) {
       const message = errorText(error);
       setProgress(null);
-      appendLog(message === UNREACHABLE_MESSAGE ? message : `操作失败: ${message}`);
+      appendLog(`操作失败: ${message}`);
     } finally {
       setBusy(null);
       void persist();

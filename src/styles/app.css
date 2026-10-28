@@ -823,6 +823,265 @@ input:disabled {
   }
 }
 
+/* -------------------------------- protocol -------------------------------- */
+
+.modal.protocol-modal {
+  width: min(680px, calc(100vw - 16px));
+  max-height: min(720px, calc(100vh - 24px));
+  display: flex;
+  flex-direction: column;
+}
+
+.modal.protocol-modal.protocol-wide {
+  width: min(760px, calc(100vw - 16px));
+}
+
+.modal.protocol-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.proto-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.proto-intro p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.proto-intro .proto-current {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+.btn .proto-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 5px;
+  vertical-align: 1.5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.proto-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.proto-section h3 {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.proto-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--panel-2) 62%, transparent);
+}
+
+.proto-frame-bar {
+  display: flex;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.proto-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.proto-seg span {
+  color: var(--ink-2);
+}
+
+.proto-seg b {
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.proto-seg-head {
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--accent) 30%, var(--panel-2));
+}
+
+.proto-seg-data {
+  background: color-mix(in srgb, var(--ok) 18%, var(--panel-2));
+}
+
+.proto-caption {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.proto-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--panel-2) 62%, transparent);
+  font-size: 12px;
+  table-layout: fixed;
+}
+
+.proto-table th {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-3) 55%, transparent);
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.proto-table td {
+  padding: 5px 8px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  vertical-align: top;
+}
+
+.proto-table th + th,
+.proto-table td + td {
+  border-left: 1px solid var(--line);
+}
+
+.proto-table td:nth-child(2) {
+  white-space: nowrap;
+}
+
+.proto-table code {
+  color: var(--ink-3);
+  font-family: var(--font-editor);
+  font-size: 11px;
+}
+
+.proto-table b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.proto-table tr.configurable td {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.proto-tag {
+  margin-left: 5px;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.proto-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 9px;
+}
+
+.proto-launch-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.proto-launch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--panel-2) 62%, transparent);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.proto-launch:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
+}
+
+.proto-launch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.proto-launch b {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.proto-launch span {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.proto-field {
+  gap: 3px;
+}
+
+.proto-field .field-caption {
+  font-size: 11.5px;
+}
+
+.proto-field input {
+  height: 25px;
+  font-size: 12px;
+}
+
+.proto-error {
+  color: var(--danger);
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+
+.proto-field input[aria-invalid="true"] {
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--line-strong));
+}
+
+.mono-input {
+  font-family: var(--font-editor);
+  letter-spacing: 0.03em;
+}
+
 @media (max-width: 900px) {
   .workspace {
     grid-template-columns: minmax(310px, 46%) minmax(0, 1fr);

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
   DEFAULT_CONFIG,
+  DEFAULT_PROTOCOL,
   NO_SYSTEM_CAPTION,
   type AppConfig,
   type AppPaths,
@@ -81,6 +82,18 @@ export async function onUpgradeProgress(
 
 export type WindowAction = "minimize" | "toggle-maximize" | "destroy";
 
+interface ProtocolWindowBackup {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
+const PROTOCOL_WINDOW_WIDTH = 1020;
+const PROTOCOL_WINDOW_HEIGHT = 800;
+
+let protocolWindowBackup: ProtocolWindowBackup | null | undefined;
+
 export async function windowAction(action: WindowAction): Promise<void> {
   if (!isTauri) return;
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -94,6 +107,49 @@ export async function isWindowMaximized(): Promise<boolean> {
   if (!isTauri) return false;
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   return getCurrentWindow().isMaximized();
+}
+
+export async function setProtocolWindowExpanded(expanded: boolean): Promise<void> {
+  if (!isTauri) return;
+  const [{ getCurrentWindow }, { PhysicalPosition, PhysicalSize }] = await Promise.all([
+    import("@tauri-apps/api/window"),
+    import("@tauri-apps/api/dpi"),
+  ]);
+  const win = getCurrentWindow();
+
+  if (!expanded) {
+    if (protocolWindowBackup === undefined) return;
+    const backup = protocolWindowBackup;
+    protocolWindowBackup = undefined;
+    if (!backup || (await win.isMaximized())) return;
+    await win.setSize(new PhysicalSize(backup.width, backup.height));
+    await win.setPosition(new PhysicalPosition(backup.x, backup.y));
+    return;
+  }
+
+  if (protocolWindowBackup !== undefined || (await win.isMaximized())) {
+    protocolWindowBackup ??= null;
+    return;
+  }
+
+  const [size, position, scale] = await Promise.all([
+    win.innerSize(),
+    win.outerPosition(),
+    win.scaleFactor(),
+  ]);
+  protocolWindowBackup = {
+    width: size.width,
+    height: size.height,
+    x: position.x,
+    y: position.y,
+  };
+
+  const targetWidth = Math.round(PROTOCOL_WINDOW_WIDTH * scale);
+  const targetHeight = Math.round(PROTOCOL_WINDOW_HEIGHT * scale);
+  const targetX = Math.max(0, Math.round(position.x + (size.width - targetWidth) / 2));
+  const targetY = Math.max(0, Math.round(position.y + (size.height - targetHeight) / 2));
+  await win.setSize(new PhysicalSize(targetWidth, targetHeight));
+  await win.setPosition(new PhysicalPosition(targetX, targetY));
 }
 
 export async function fetchChromeMetrics(): Promise<ChromeMetrics | null> {
@@ -173,7 +229,11 @@ function readPreviewSession(): SessionState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<SessionState>;
     return {
-      config: { ...DEFAULT_CONFIG, ...(parsed.config ?? {}) },
+      config: {
+        ...DEFAULT_CONFIG,
+        ...(parsed.config ?? {}),
+        protocol: { ...DEFAULT_PROTOCOL, ...parsed.config?.protocol },
+      },
       window: parsed.window ?? null,
     };
   } catch {

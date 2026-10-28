@@ -1,5 +1,27 @@
 export type ThemeName = "dark" | "light";
 
+export interface ProtocolSettings {
+  port: number;
+  packetSize: number;
+  magic: number;
+  packetType: number;
+  statusOffset: number;
+  connectTimeoutS: number;
+  connectAttempts: number;
+  recvTimeoutS: number;
+}
+
+export const DEFAULT_PROTOCOL: ProtocolSettings = {
+  port: 9000,
+  packetSize: 4096,
+  magic: 0x9000,
+  packetType: 2,
+  statusOffset: 32,
+  connectTimeoutS: 12,
+  connectAttempts: 3,
+  recvTimeoutS: 120,
+};
+
 export interface AppConfig {
   ip: string;
   filePath: string;
@@ -9,6 +31,7 @@ export interface AppConfig {
   ftpFolder: string;
   useLocal: boolean;
   theme: ThemeName;
+  protocol: ProtocolSettings;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -20,6 +43,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   ftpFolder: "/",
   useLocal: true,
   theme: "dark",
+  protocol: DEFAULT_PROTOCOL,
 };
 
 export interface WindowGeometry {
